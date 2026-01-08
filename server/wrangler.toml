@@ -1,0 +1,10 @@
+name = "shareplz-server"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Durable Objects 설정
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+
+
