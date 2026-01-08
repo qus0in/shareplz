@@ -47,3 +47,16 @@ export async function updateContent(id: string, content: string): Promise<boolea
         .run();
     return true;
 }
+
+/**
+ * 룸을 삭제합니다.
+ */
+export async function deleteRoom(id: string): Promise<boolean> {
+    const db = getDB();
+    await db
+        .prepare("DELETE FROM rooms WHERE id = ?")
+        .bind(id)
+        .run();
+    return true;
+}
+

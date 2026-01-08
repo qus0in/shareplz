@@ -1,9 +1,12 @@
-import { Share2, ShieldCheck, CheckCircle2 } from "lucide-react";
+"use client";
+
+import { Share2, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface EditorHeaderProps {
     id: string;
@@ -16,7 +19,43 @@ interface EditorHeaderProps {
     onAuth: () => void;
 }
 
+/**
+ * 에디터 상단 헤더 컴포넌트
+ */
 export function EditorHeader({ id, role, status, isEditing, pin, content, setPin, onAuth }: EditorHeaderProps) {
+    const router = useRouter();
+
+    /**
+     * 방 삭제 처리
+     */
+    const handleDelete = async () => {
+        if (!confirm("정말로 이 방을 삭제하시겠습니까? 모든 데이터가 영구적으로 삭제됩니다.")) {
+            return;
+        }
+
+        try {
+            // 권한 획득 후 pin 상태가 ""으로 초기화되므로 sessionStorage의 값을 사용합니다.
+            const savedPin = sessionStorage.getItem(`room_${id}_pin`) || pin;
+
+            const res = await fetch(`/api/room/${id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pin: savedPin }),
+            });
+
+
+            if (res.ok) {
+                toast.success("방이 성공적으로 삭제되었습니다.");
+                router.push("/");
+            } else {
+                const data = await res.json() as { error: string };
+                toast.error(data.error || "삭제에 실패했습니다.");
+            }
+        } catch (error) {
+            toast.error("삭제 요청 중 오류가 발생했습니다.");
+        }
+    };
+
     return (
         <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-10">
             <div className="flex items-center gap-4">
@@ -57,6 +96,17 @@ export function EditorHeader({ id, role, status, isEditing, pin, content, setPin
                     </div>
                 )}
                 <div className="flex bg-zinc-900 rounded-md border border-zinc-800 overflow-hidden">
+                    {role === "editor" && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-[10px] text-red-500 hover:text-red-400 hover:bg-red-500/10 rounded-none border-r border-zinc-800 px-3 flex items-center gap-1.5"
+                            onClick={handleDelete}
+                        >
+                            <Trash2 size={10} />
+                            DELETE
+                        </Button>
+                    )}
                     <Button variant="ghost" size="sm" className="h-8 text-[10px] text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-none border-r border-zinc-800 px-3" onClick={() => {
                         navigator.clipboard.writeText(content);
                         toast.success("전체 내용 복사 완료");

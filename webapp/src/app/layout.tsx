@@ -2,17 +2,29 @@ import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import "./globals.css";
 
+// 배포 환경의 base URL 설정
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://shareplz.qus0in.dev";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(baseUrl),
   title: "SHAREPLZ",
-  description: "Secure, real-time text sharing used by developers worldwide. Anonymous, encrypted, and ephemeral.",
+  description: "실시간 텍스트 공유",
   icons: {
     icon: "/favicon.svg",
   },
   openGraph: {
     title: "SHAREPLZ",
-    description: "The fastest way to share code securely. No sign-up required.",
+    description: "실시간 텍스트 공유",
     type: "website",
     siteName: "SHAREPLZ",
+    images: [
+      {
+        url: "/preview.png",
+        width: 1200,
+        height: 630,
+        alt: "SHAREPLZ - 실시간 텍스트 공유",
+      },
+    ],
   },
 };
 

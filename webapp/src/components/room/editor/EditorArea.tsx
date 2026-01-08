@@ -8,17 +8,31 @@ interface EditorAreaProps {
 
 export function EditorArea({ role, content, onContentChange }: EditorAreaProps) {
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const highlightRef = useRef<HTMLDivElement>(null);
+
+    const handleScroll = () => {
+        if (textareaRef.current && highlightRef.current) {
+            highlightRef.current.scrollTop = textareaRef.current.scrollTop;
+            highlightRef.current.scrollLeft = textareaRef.current.scrollLeft;
+        }
+    };
 
     return (
-        <div className="flex-1 relative group">
+        <div className="flex-1 relative group bg-zinc-950">
             {/* Overlay Info */}
-            <div className="absolute top-4 left-6 text-[9px] text-zinc-800 pointer-events-none select-none flex gap-4 uppercase z-10 transition-opacity opacity-50 group-hover:opacity-100">
-                <span>$ ROLE: {role}</span>
-                <span>$ LEN: {content.length}</span>
+            <div className="absolute top-0 left-0 text-[10px] text-zinc-500 pointer-events-none select-none flex gap-4 uppercase z-20 backdrop-blur-md bg-zinc-950/50 p-2 pr-4 rounded-br-xl border-b border-r border-zinc-800/50">
+                <span className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                    {role}
+                </span>
+                <span className="opacity-50">LEN: {content.length}</span>
             </div>
 
             {/* 주석 하이라이팅 및 링크 감지 오버레이 */}
-            <div className="absolute inset-0 p-8 pt-12 overflow-hidden pointer-events-none font-mono text-lg leading-relaxed whitespace-pre-wrap break-words">
+            <div
+                ref={highlightRef}
+                className="absolute inset-0 p-8 pt-16 overflow-hidden pointer-events-none font-mono text-lg leading-relaxed whitespace-pre-wrap break-words"
+            >
                 {content.split('\n').map((line, idx) => {
                     const isComment = line.trim().startsWith('#') || line.trim().startsWith('//');
                     const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -39,7 +53,7 @@ export function EditorArea({ role, content, onContentChange }: EditorAreaProps) 
                                                 href={part}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="text-blue-400 underline hover:text-blue-300 pointer-events-auto cursor-pointer"
+                                                className="text-blue-400 underline hover:text-blue-300 pointer-events-auto cursor-pointer relative z-10"
                                             >
                                                 {part}
                                             </a>
@@ -56,7 +70,8 @@ export function EditorArea({ role, content, onContentChange }: EditorAreaProps) 
             {/* 실제 입력 textarea */}
             <textarea
                 ref={textareaRef}
-                className={`relative w-full h-full p-8 pt-12 bg-transparent text-zinc-100/0 text-lg resize-none outline-none font-mono leading-relaxed caret-zinc-100 selection:bg-blue-500/30 selection:text-zinc-100 ${role !== "editor" ? "cursor-default pointer-events-none" : ""}`}
+                onScroll={handleScroll}
+                className={`relative w-full h-full p-8 pt-16 bg-transparent text-zinc-100/0 text-lg resize-none outline-none font-mono leading-relaxed caret-zinc-100 selection:bg-blue-500/30 selection:text-zinc-100 ${role !== "editor" ? "cursor-default" : ""}`}
                 spellCheck={false}
                 value={content}
                 onChange={onContentChange}

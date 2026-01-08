@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRoom, updateContent } from "@/lib/db";
+import { getRoom, updateContent, deleteRoom } from "@/lib/db";
 
 export const runtime = "edge";
 
@@ -65,5 +65,37 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     await updateContent(id, content);
+    return NextResponse.json({ success: true });
+}
+
+/**
+ * 방을 삭제합니다 (편집 권한 필요)
+ */
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id: roomId } = await params;
+    const body = await request.json() as { pin: string };
+    const { pin } = body;
+
+    const room = await getRoom(roomId);
+
+    if (!room || room.edit_pin !== pin) {
+        return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
+    }
+
+    // 1. D1 데이터베이스에서 삭제
+    await deleteRoom(roomId);
+
+    // 2. Durable Object 상태 삭제 및 인스턴스 종료 요청
+    // Webapp의 바인딩을 사용하지 않고 서버 워커의 엔드포인트를 호출합니다.
+    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || "https://shareplz-server.qus0in.workers.dev";
+
+    try {
+        await fetch(`${serverUrl}/api/room?roomId=${roomId}`, {
+            method: "DELETE"
+        });
+    } catch (error) {
+        console.error("Failed to notify DO about deletion:", error);
+    }
+
     return NextResponse.json({ success: true });
 }
