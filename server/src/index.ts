@@ -1,19 +1,18 @@
 import { DurableObject } from "cloudflare:workers";
 
 interface Env {
-    ROOM: DurableObjectNamespace<Room>;
+    NEW_ROOM: DurableObjectNamespace<SharePlzSession>;
     DB: D1Database;
 }
 
 /**
- * 실시간 협업을 위한 룸 Durable Object
+ * 실시간 협업을 위한 룸 Durable Object (SharePlzSession)
  */
-export class Room extends DurableObject {
-    private sessions: Set<WebSocket> = new Set();
+export class SharePlzSession extends DurableObject {
     private content: string = "";
     private roomId: string = "";
     private dbEnv: Env;
-    private saveTimer: number | null = null;
+    private lastSaveTime: number = 0;
 
     constructor(state: DurableObjectState, env: Env) {
         super(state, env);
@@ -27,106 +26,102 @@ export class Room extends DurableObject {
     }
 
     async fetch(request: Request): Promise<Response> {
-        const url = new URL(request.url);
-        const roomId = url.searchParams.get("roomId");
+        try {
+            const url = new URL(request.url);
+            const roomId = url.searchParams.get("roomId");
+            console.log(`[DO] Fetch received. Room: ${roomId}, URL: ${request.url}`);
 
-        if (roomId && !this.roomId) {
-            this.roomId = roomId;
-            await this.ctx.storage.put("roomId", roomId);
-        }
+            if (roomId && !this.roomId) {
+                this.roomId = roomId;
+                await this.ctx.storage.put("roomId", roomId);
+            }
 
-        const upgradeHeader = request.headers.get("Upgrade");
-        if (!upgradeHeader || upgradeHeader !== "websocket") {
-            // WebSocket이 아닌 경우 현재 콘텐츠 반환
-            return new Response(JSON.stringify({ content: this.content }), {
-                headers: { "Content-Type": "application/json" },
+            const upgradeHeader = request.headers.get("Upgrade");
+            console.log(`[DO] Upgrade Header: ${upgradeHeader}`);
+
+            if (!upgradeHeader || upgradeHeader.toLowerCase() !== "websocket") {
+                return new Response(JSON.stringify({ content: this.content }), {
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+
+            const pair = new WebSocketPair();
+            const client = pair[0];
+            const server = pair[1];
+
+            this.ctx.acceptWebSocket(server);
+            console.log(`[DO] WebSocket accepted for room: ${roomId}`);
+
+            // 연결 즉시 초기 데이터 전송
+            server.send(JSON.stringify({ type: "init", content: this.content }));
+
+            return new Response(null, {
+                status: 101,
+                webSocket: client,
             });
+        } catch (error) {
+            console.error(`[DO] Error in fetch:`, error);
+            // WebSocket 핸드셰이크 요청에 대해서는 500을 명확히 반환
+            return new Response(`Internal Server Error: ${error}`, { status: 500 });
         }
-
-        const pair = new WebSocketPair();
-        const client = pair[0];
-        const server = pair[1];
-
-        await this.handleSession(server);
-
-        return new Response(null, {
-            status: 101,
-            webSocket: client,
-        });
     }
 
-    private async handleSession(ws: WebSocket) {
-        ws.accept();
-        this.sessions.add(ws);
+    async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+        try {
+            const data = JSON.parse(message as string);
+            if (data.type === "update") {
+                this.content = data.content;
 
-        // 초기 콘텐츠 전송
-        ws.send(JSON.stringify({ type: "init", content: this.content }));
+                // DO 메모리/스토리지 업데이트 (가장 빠름)
+                await this.ctx.storage.put("content", this.content);
 
-        ws.addEventListener("message", async (msg) => {
-            try {
-                const data = JSON.parse(msg.data as string);
-                if (data.type === "update") {
-                    this.content = data.content;
+                // 브로드캐스트 (자신 제외)
+                this.broadcast(JSON.stringify({ type: "update", content: this.content }), ws);
 
-                    // Durable Object Storage에 즉시 저장
-                    await this.ctx.storage.put("content", this.content);
-
-                    // 다른 클라이언트에게 전송
-                    this.broadcast(JSON.stringify({ type: "update", content: this.content }), ws);
-
-                    // D1 백업 예약 (디바운스: 3초 후 저장)
-                    this.scheduleD1Backup();
+                // D1 저장은 Alarm으로 위임하여 부하 분산 (즉시 저장 X)
+                const currentAlarm = await this.ctx.storage.getAlarm();
+                if (currentAlarm == null) {
+                    // 10초 뒤에 저장 (배칭 효과)
+                    await this.ctx.storage.setAlarm(Date.now() + 10000);
                 }
-            } catch (e) {
-                console.error("WebSocket message error:", e);
             }
-        });
+        } catch (e) {
+            console.error("WebSocket message error:", e);
+        }
+    }
 
-        ws.addEventListener("close", () => {
-            this.sessions.delete(ws);
-        });
+    async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+        // Hibernation 자동 관리
+    }
+
+    async webSocketError(ws: WebSocket, error: any) {
+        console.error("WebSocket error:", error);
     }
 
     private broadcast(message: string, sender?: WebSocket) {
-        for (const session of this.sessions) {
+        for (const session of this.ctx.getWebSockets()) {
             if (session !== sender) {
                 try {
                     session.send(message);
                 } catch (e) {
-                    this.sessions.delete(session);
+                    // Hibernation API 관리
                 }
             }
         }
     }
 
-    /**
-     * D1 백업을 디바운스 처리하여 예약합니다.
-     * 마지막 업데이트 후 3초 뒤에 실행됩니다.
-     */
-    private scheduleD1Backup() {
-        if (this.saveTimer !== null) {
-            clearTimeout(this.saveTimer);
-        }
-
-        this.saveTimer = setTimeout(async () => {
-            await this.saveToD1();
-            this.saveTimer = null;
-        }, 3000) as unknown as number;
+    async alarm() {
+        await this.saveToD1();
     }
 
-    /**
-     * 현재 콘텐츠를 D1 데이터베이스에 백업합니다.
-     */
     private async saveToD1() {
         if (!this.roomId) return;
-
+        // 빈 내용이거나 변경사항이 없으면 스킵 로직 추가 가능하지만 단순화 유지
         try {
             await this.dbEnv.DB
                 .prepare("UPDATE rooms SET content = ? WHERE id = ?")
                 .bind(this.content, this.roomId)
                 .run();
-
-            console.log(`[DO] Saved to D1: room=${this.roomId}, size=${this.content.length}`);
         } catch (e) {
             console.error("[DO] D1 backup error:", e);
         }
@@ -142,9 +137,12 @@ export default {
             return new Response("Room ID required", { status: 400 });
         }
 
-        const id = env.ROOM.idFromName(roomId);
-        const obj = env.ROOM.get(id);
+        const id = env.NEW_ROOM.idFromName(roomId);
+        const obj = env.NEW_ROOM.get(id);
 
         return obj.fetch(request);
     },
 };
+
+export class Room extends DurableObject { }
+export class ProjectAlpha extends DurableObject { }

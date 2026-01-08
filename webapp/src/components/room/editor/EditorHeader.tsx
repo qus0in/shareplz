@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Edit3 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 interface EditorHeaderProps {
     id: string;
@@ -20,8 +21,11 @@ export function EditorHeader({ id, role, status, isEditing, pin, content, setPin
         <header className="flex items-center justify-between px-6 py-3 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md z-10">
             <div className="flex items-center gap-4">
                 <h1 className="text-sm font-bold text-white tracking-tighter flex items-center gap-2">
-                    <Share2 size={14} className="text-blue-500" />
-                    SHAREPLZ / <span className="text-zinc-500 font-normal">{id}</span>
+                    <Link href="/" className="flex items-center gap-2 hover:text-zinc-300 transition-colors">
+                        <Share2 size={14} className="text-blue-500" />
+                        SHAREPLZ
+                    </Link>
+                    / <span className="text-zinc-500 font-normal">{id}</span>
                 </h1>
                 <div className="flex items-center gap-2 px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-800">
                     <div className={`w-1.5 h-1.5 rounded-full ${isEditing ? 'bg-blue-500 animate-pulse' : (status === 'connected' ? 'bg-green-500' : 'bg-red-500')}`}></div>

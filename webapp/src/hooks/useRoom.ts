@@ -48,6 +48,15 @@ export function useRoom(id: string) {
         fetchRoom();
     }, [fetchRoom]);
 
+    // 편집 상태 트리거 (디바운스)
+    const triggerEditingState = () => {
+        setIsEditing(true);
+        if (editTimeoutRef.current) clearTimeout(editTimeoutRef.current);
+        editTimeoutRef.current = setTimeout(() => {
+            setIsEditing(false);
+        }, 1000);
+    };
+
     // WebSocket 연결 함수
     const connectWebSocket = useCallback(() => {
         if (isUnmountingRef.current) return;
@@ -60,10 +69,7 @@ export function useRoom(id: string) {
         const socket = new WebSocket(`wss://shareplz-server.qus0in.workers.dev?roomId=${id}`);
         wsRef.current = socket;
 
-        // 초기 연결 시에만 connecting 상태 표시
-        if (status === "disconnected") {
-            setStatus("connecting");
-        }
+        setStatus("connecting");
 
         socket.onopen = () => {
             setStatus("connected");
@@ -78,7 +84,7 @@ export function useRoom(id: string) {
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data) as { type: string; content?: string };
             if (data.type === "init") {
-                if (data.content !== undefined && !content) setContent(data.content);
+                if (data.content !== undefined) setContent(data.content);
             } else if (data.type === "update" && data.content !== undefined) {
                 setContent(data.content);
                 // 수신 시에도 편집 중 상태 잠깐 표시
@@ -107,16 +113,8 @@ export function useRoom(id: string) {
         };
 
         setWs(socket);
-    }, [id, role, content, status]);
-
-    // 편집 상태 트리거 (디바운스)
-    const triggerEditingState = () => {
-        setIsEditing(true);
-        if (editTimeoutRef.current) clearTimeout(editTimeoutRef.current);
-        editTimeoutRef.current = setTimeout(() => {
-            setIsEditing(false);
-        }, 1000);
-    };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
 
     // 초기 연결 및 역할 변경 시 연결
     useEffect(() => {
