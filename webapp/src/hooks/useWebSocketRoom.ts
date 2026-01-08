@@ -1,7 +1,16 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { WebSocketManager } from "@/lib/WebSocketManager";
+import { toast } from "sonner";
+
+interface WSMessage {
+    type: string;
+    content?: string;
+    userId?: string;
+    reason?: string;
+}
 
 interface UseWebSocketRoomProps {
+
     id: string;
     onContentUpdate: (content: string) => void;
     onEditingStateTrigger: () => void;
@@ -10,6 +19,7 @@ interface UseWebSocketRoomProps {
 export function useWebSocketRoom({ id, onContentUpdate, onEditingStateTrigger }: UseWebSocketRoomProps) {
     const [status, setStatus] = useState<"connecting" | "connected" | "disconnected">("disconnected");
     const [ws, setWs] = useState<WebSocket | null>(null);
+    const [lockedBy, setLockedBy] = useState<string | null>(null);
 
     const wsManagerRef = useRef<WebSocketManager | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -32,23 +42,32 @@ export function useWebSocketRoom({ id, onContentUpdate, onEditingStateTrigger }:
                     reconnectTimeoutRef.current = null;
                 }
             },
-            onMessage: (data) => {
+            onMessage: (rawData) => {
+                const data = rawData as WSMessage;
                 if (data.type === "init") {
                     if (data.content !== undefined) onContentUpdate(data.content);
                 } else if (data.type === "update" && data.content !== undefined) {
                     onContentUpdate(data.content);
                     onEditingStateTrigger();
+                } else if (data.type === "lock_acquired") {
+                    setLockedBy(data.userId || "Someone");
+                    onEditingStateTrigger();
+                } else if (data.type === "lock_released") {
+                    setLockedBy(null);
+                } else if (data.type === "lock_failed") {
+                    toast.error(data.reason);
                 }
             },
+
             onClose: (event) => {
                 if (isUnmountingRef.current) return;
 
                 setStatus("disconnected");
                 setWs(null);
+                setLockedBy(null);
 
                 if (!event.wasClean) {
                     const delay = 1000 + Math.random() * 2000;
-                    console.log(`WebSocket closed. Reconnecting inside ${delay}ms...`);
                     reconnectTimeoutRef.current = setTimeout(() => {
                         connectWebSocket();
                     }, delay);
@@ -81,7 +100,9 @@ export function useWebSocketRoom({ id, onContentUpdate, onEditingStateTrigger }:
     return {
         ws,
         status,
+        lockedBy,
         connectWebSocket,
         isUnmountingRef
     };
 }
+

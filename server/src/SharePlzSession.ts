@@ -17,7 +17,12 @@ export class SharePlzSession extends DurableObject {
     private connectionManager: ConnectionManager;
     private messageHandler: MessageHandler;
 
+    // 현재 편집 중인 사용자의 소켓 (잠금 매커니즘)
+    public activeEditor: WebSocket | null = null;
+    private lockTimeout: any = null;
+
     constructor(state: DurableObjectState, env: Env) {
+
         super(state, env);
         this.dbEnv = env;
 
@@ -93,6 +98,7 @@ export class SharePlzSession extends DurableObject {
         await this.messageHandler.handle(
             ws,
             message,
+            this, // 세션 인스턴스 전달 (Lock 관리용)
             this.ctx.storage,
             this.ctx.getWebSockets(),
             (newContent) => {
@@ -102,7 +108,15 @@ export class SharePlzSession extends DurableObject {
     }
 
     async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-        // Hibernation 자동 관리
+        // 편집 중이던 사용자가 나가면 잠금 해제
+        if (this.activeEditor === ws) {
+            this.activeEditor = null;
+            if (this.lockTimeout) clearTimeout(this.lockTimeout);
+
+            // 모든 클라이언트에게 편집 가능 상태 알림
+            const sockets = this.ctx.getWebSockets();
+            this.connectionManager.broadcast(sockets, JSON.stringify({ type: "lock_released" }));
+        }
     }
 
     async webSocketError(ws: WebSocket, error: any) {

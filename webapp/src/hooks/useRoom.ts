@@ -26,13 +26,14 @@ export function useRoom(id: string) {
     }, []);
 
     // WebSocket 훅 사용
-    const { ws, status, connectWebSocket, isUnmountingRef } = useWebSocketRoom({
+    const { ws, status, lockedBy, connectWebSocket, isUnmountingRef } = useWebSocketRoom({
         id,
         onContentUpdate: setContent,
         onEditingStateTrigger: triggerEditingState
     });
 
     // D1에서 초기 데이터 로드
+
     const fetchRoom = useCallback(async () => {
         try {
             const res = await fetch(`/api/room/${id}`);
@@ -95,8 +96,10 @@ export function useRoom(id: string) {
         ws,
         loading,
         status,
+        lockedBy,
         isEditing,
         requiresReadAuth,
         triggerEditingState
     };
 }
+

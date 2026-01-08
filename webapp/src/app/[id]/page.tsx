@@ -16,6 +16,8 @@ export default function RoomPage() {
         role,
         content,
         status,
+        lockedBy,
+        userId,
         isEditing,
         requiresReadAuth,
         pin,
@@ -40,9 +42,12 @@ export default function RoomPage() {
     return (
         <EditorView
             id={id}
-            role={role as "viewer" | "editor"}
+            role={role === "none" ? "viewer" : role}
             content={content}
+
             status={status}
+            lockedBy={lockedBy}
+            userId={userId}
             isEditing={isEditing}
             pin={pin}
             setPin={setPin}

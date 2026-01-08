@@ -8,6 +8,8 @@ interface EditorViewProps {
     content: string;
     status: "connecting" | "connected" | "disconnected";
     isEditing: boolean;
+    lockedBy: string | null;
+    userId: string;
     pin: string;
     setPin: (pin: string) => void;
     onContentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
@@ -17,9 +19,9 @@ interface EditorViewProps {
 /**
  * 에디터 화면 메인 컴포넌트
  */
-export function EditorView({ id, role, content, status, isEditing, pin, setPin, onContentChange, onAuth }: EditorViewProps) {
+export function EditorView({ id, role, content, status, isEditing, lockedBy, userId, pin, setPin, onContentChange, onAuth }: EditorViewProps) {
     return (
-        <main className="flex flex-col h-screen bg-zinc-950 text-zinc-300 overflow-hidden font-mono">
+        <main className="flex flex-col h-screen bg-zinc-950 text-zinc-300 overflow-hidden font-mono relative">
             <EditorHeader
                 id={id}
                 role={role}
@@ -34,8 +36,11 @@ export function EditorView({ id, role, content, status, isEditing, pin, setPin, 
             <EditorArea
                 role={role}
                 content={content}
+                lockedBy={lockedBy}
+                userId={userId}
                 onContentChange={onContentChange}
             />
+
 
             <EditorFooter
                 content={content}
