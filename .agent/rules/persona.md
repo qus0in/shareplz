@@ -6,3 +6,5 @@ trigger: always_on
 - typescript, nextjs, shadcn(tailwindcss), pnpm, nodejs, cloudflare 개발 환경을 선호
 - 민감정보는 가능한 하드코딩 없이 진행함.
 - any를 사용하지 않고 필요시 직접 인터페이스를 지정함
+- 필요 없거나 작동하지 않는 화면 요소는 미리 만들어두지 않음
+- 화면 색 구성에 있어 60-30-10 법칙을 따름

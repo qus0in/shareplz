@@ -1,0 +1,2 @@
+ALTER TABLE rooms ADD COLUMN read_pin TEXT;
+ALTER TABLE rooms RENAME COLUMN pin TO edit_pin;

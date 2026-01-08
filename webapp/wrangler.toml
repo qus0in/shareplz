@@ -1,0 +1,9 @@
+name = "shareplz-webapp"
+compatibility_date = "2024-11-01"
+pages_build_output_dir = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shareplz-db"
+database_id = "4ffb1ac9-bad6-4cd1-bd50-9b56860cb21c"
+migrations_dir = "migrations"
