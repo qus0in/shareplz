@@ -9,6 +9,8 @@ import { EditorView } from "@/components/room/EditorView";
 /**
  * 공유방 상세 페이지
  */
+export const runtime = 'edge';
+
 export default function RoomPage() {
     const { id } = useParams() as { id: string };
     const { role, setRole, content, setContent, ws, loading, status, requiresReadAuth } = useRoom(id);
