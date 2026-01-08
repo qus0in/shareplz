@@ -13,7 +13,7 @@ export const runtime = 'edge';
 
 export default function RoomPage() {
     const { id } = useParams() as { id: string };
-    const { role, setRole, content, setContent, ws, loading, status, requiresReadAuth } = useRoom(id);
+    const { role, setRole, content, setContent, ws, loading, status, isEditing, requiresReadAuth, triggerEditingState } = useRoom(id);
     const { pin, setPin, handleAuth } = useAuth(id, role, loading, setRole);
 
     // 내용 변경 핸들러
@@ -22,6 +22,7 @@ export default function RoomPage() {
 
         const newContent = e.target.value;
         setContent(newContent);
+        triggerEditingState();
 
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "update", content: newContent }));
@@ -46,6 +47,7 @@ export default function RoomPage() {
             role={role as "viewer" | "editor"}
             content={content}
             status={status}
+            isEditing={isEditing}
             pin={pin}
             setPin={setPin}
             onContentChange={handleContentChange}
